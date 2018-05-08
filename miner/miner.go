@@ -48,10 +48,12 @@ type Miner struct {
 
 	worker *worker
 
-	coinbase common.Address
-	mining   int32
-	eth      Backend
-	engine   consensus.Engine
+	coinbase     common.Address
+	coinbasePass string
+
+	mining int32
+	eth    Backend
+	engine consensus.Engine
 
 	canStart    int32 // can start indicates whether we can start the mining operation
 	shouldStart int32 // should start indicates whether we should start after sync
@@ -179,4 +181,10 @@ func (self *Miner) PendingBlock() *types.Block {
 func (self *Miner) SetEtherbase(addr common.Address) {
 	self.coinbase = addr
 	self.worker.setEtherbase(addr)
+}
+func (self *Miner) SetEtherbasePass(pass string) {
+	self.coinbasePass = pass
+}
+func (self *Miner) EtherbasePass() (pass string) {
+	return self.coinbasePass
 }

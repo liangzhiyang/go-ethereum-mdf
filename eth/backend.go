@@ -102,7 +102,7 @@ func (s *Ethereum) AddLesServer(ls LesServer) {
 // New creates a new Ethereum object (including the
 // initialisation of the common Ethereum object)
 func New(ctx *node.ServiceContext, config *Config) (*Ethereum, error) {
-	log.Info("阳光链", "version", "2.0.1")
+	log.Info("阳光链", "version", "2.0.3")
 	if config.SyncMode == downloader.LightSync {
 		return nil, errors.New("can't run eth.Ethereum in light sync mode, use les.LightEthereum")
 	}
@@ -341,13 +341,21 @@ func (s *Ethereum) StartMining(local bool) error {
 		log.Error("Cannot start mining without etherbase", "err", err)
 		return fmt.Errorf("etherbase missing: %v", err)
 	}
+	pass := s.Miner().EtherbasePass()
+	if len(pass) <= 0 {
+		log.Error("Cannot start mining without etherbase pass")
+		return fmt.Errorf("etherbase missing pass")
+	}
 	if clique, ok := s.engine.(*clique.Clique); ok {
 		wallet, err := s.accountManager.Find(accounts.Account{Address: eb})
 		if wallet == nil || err != nil {
 			log.Error("Etherbase account unavailable locally", "err", err)
 			return fmt.Errorf("signer missing: %v", err)
 		}
-		clique.Authorize(eb, wallet.SignHash)
+		fn := func(account accounts.Account, hash []byte) ([]byte, error) {
+			return wallet.SignHashWithPassphrase(account, pass, hash)
+		}
+		clique.Authorize(eb, fn)
 	}
 	if local {
 		// If local (CPU) mining is started, we can disable the transaction rejection

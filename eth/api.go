@@ -192,6 +192,10 @@ func (api *PrivateMinerAPI) SetEtherbase(etherbase common.Address) bool {
 	api.e.SetEtherbase(etherbase)
 	return true
 }
+func (api *PrivateMinerAPI) SetEtherbasePass(pass string) bool {
+	api.e.Miner().SetEtherbasePass(pass)
+	return true
+}
 
 // GetHashrate returns the current hashrate of the miner.
 func (api *PrivateMinerAPI) GetHashrate() uint64 {
