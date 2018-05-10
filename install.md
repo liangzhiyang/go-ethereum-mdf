@@ -37,3 +37,9 @@
 
 * geth --datadir data init genesis.json
 * geth --datadir data --networkid 123456 --ws --wsaddr 0.0.0.0  --rpc --rpcaddr 0.0.0.0 --rpccorsdomain "*" --nodiscover console
+
+* 开启挖矿的时候 需要提前设置一下
+```
+ 1. miner.setEtherbase("0x11111")//你自己的挖矿的地址
+ 2. miner.setEtherbasePass("password")//对应上面账户的密码
+```
