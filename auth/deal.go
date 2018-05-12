@@ -46,7 +46,7 @@ func Add(from, to common.Address, addAuth *Auth, state *state.StateDB) (err erro
 		return
 	}
 	parentTo, _ := getParentInfo(state.GetState(to, authconst.KeyYglAddrParent))
-	if parentTo.Big().Sign() != 0 && !bytes.Equal(parentTo[:], from[:]) {
+	if parentTo.Big().Sign() != 0 && !bytes.Equal(parentTo[:],from[:]) {
 		err = fmt.Errorf("auth.add  %v=>%v addAuth=(%v) parentTo=(%v) is not belong to you;",
 			from.Hex(), to.Hex(), addAuth.String(), parentTo.Hex())
 		log.Warn("auth.add.belong", "err", err)
@@ -65,7 +65,7 @@ func Add(from, to common.Address, addAuth *Auth, state *state.StateDB) (err erro
 		state.SetState(from, authconst.KeyYglChildNum, common.BigToHash(big.NewInt(num+1)))
 		k := common.BytesToHash([]byte(authconst.KeyYglChildPrefix + strconv.Itoa(int(num))))
 		state.SetState(from, k, common.BytesToHash(to.Bytes()))
-		state.SetState(to, authconst.KeyYglAddrParent, genParentInfo(to, num))
+		state.SetState(to, authconst.KeyYglAddrParent, genParentInfo(from, num))
 	}
 
 	authTo.Add(addAuth)
