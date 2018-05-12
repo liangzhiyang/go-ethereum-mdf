@@ -22,6 +22,7 @@ import (
 	"io"
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/auth/authconst"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -90,7 +91,8 @@ type stateObject struct {
 
 // empty returns whether the account is considered empty.
 func (s *stateObject) empty() bool {
-	return s.data.Nonce == 0 && s.data.Balance.Sign() == 0 && bytes.Equal(s.data.CodeHash, emptyCodeHash)
+	return s.data.Nonce == 0 && s.data.Balance.Sign() == 0 && bytes.Equal(s.data.CodeHash, emptyCodeHash) &&
+		common.EmptyHash(s.GetState(s.db.db, authconst.KeyYglAddrAuth))
 }
 
 // Account is the Ethereum consensus representation of accounts.

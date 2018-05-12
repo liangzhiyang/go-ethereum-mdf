@@ -68,6 +68,9 @@ func (a *Auth) HasOne(auths ...*Auth) (bool) {
 	}
 	return false
 }
+func (a *Auth) IsRoot() (bool) {
+	return a.HasAll(AuthRoot)
+}
 
 func (a *Auth) String() string {
 	data := make([]string, 0)
