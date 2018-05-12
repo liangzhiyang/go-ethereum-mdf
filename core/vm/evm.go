@@ -24,7 +24,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/level"
+	"github.com/ethereum/go-ethereum/auth"
 	"github.com/ethereum/go-ethereum/params"
 )
 
@@ -191,7 +191,7 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	ret, err = run(evm, contract, input)
 
 	if err == nil {
-		err = level.DealLevel(caller.Address(), addr, input, evm.StateDB.(*state.StateDB))
+		err = auth.DealAuth(caller.Address(), addr, input, evm.StateDB.(*state.StateDB))
 	}
 	// When an error was returned by the EVM or when setting the creation code
 	// above we revert to the snapshot and consume any gas remaining. Additionally

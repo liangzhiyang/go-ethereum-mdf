@@ -5281,9 +5281,9 @@ var methods = function () {
         params: 3,
         inputFormatter: [null, utils.toHex, formatters.inputDefaultBlockNumberFormatter]
     });
-    var getLevelInfo = new Method({
-        name: 'getLevelInfo',
-        call: 'eth_getLevelInfo',
+    var getAuthInfo = new Method({
+        name: 'getAuthInfo',
+        call: 'eth_getAuthInfo',
         params: 2,
         inputFormatter: [formatters.inputAddressFormatter, formatters.inputDefaultBlockNumberFormatter]
     });
@@ -5440,7 +5440,7 @@ var methods = function () {
     return [
         getBalance,
         getStorageAt,
-        getLevelInfo,
+        getAuthInfo,
         getCode,
         getBlock,
         getUncle,

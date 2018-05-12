@@ -36,7 +36,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/level"
+	"github.com/ethereum/go-ethereum/auth"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/params"
@@ -603,12 +603,12 @@ func (s *PublicBlockChainAPI) GetStorageAt(ctx context.Context, address common.A
 	return res[:], state.Error()
 }
 
-func (s *PublicBlockChainAPI) GetLevelInfo(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (map[string]interface{}, error) {
+func (s *PublicBlockChainAPI) GetAuthInfo(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (map[string]interface{}, error) {
 	state, _, err := s.b.StateAndHeaderByNumber(ctx, blockNr)
 	if state == nil || err != nil {
 		return nil, err
 	}
-	return level.GetLevelInfo(address, state)
+	return auth.GetAuthInfo(address, state)
 }
 
 // CallArgs represents the arguments for a call.
