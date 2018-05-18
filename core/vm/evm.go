@@ -21,10 +21,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ethereum/go-ethereum/auth"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/auth"
 	"github.com/ethereum/go-ethereum/params"
 )
 
@@ -151,7 +151,6 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	if !evm.Context.CanTransfer(evm.StateDB, caller.Address(), value) {
 		return nil, gas, ErrInsufficientBalance
 	}
-
 	var (
 		to       = AccountRef(addr)
 		snapshot = evm.StateDB.Snapshot()
@@ -188,10 +187,12 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 			evm.vmConfig.Tracer.CaptureEnd(ret, gas-contract.Gas, time.Since(start), err)
 		}()
 	}
-	ret, err = run(evm, contract, input)
-
+	yglInput, srcInput, err := auth.SplitInput(input)
 	if err == nil {
-		err = auth.DealAuth(caller.Address(), addr, input, evm.StateDB.(*state.StateDB))
+		ret, err = run(evm, contract, srcInput)
+	}
+	if err == nil {
+		err = auth.DealAuth(caller.Address(), addr, yglInput, evm.StateDB.(*state.StateDB))
 	}
 	// When an error was returned by the EVM or when setting the creation code
 	// above we revert to the snapshot and consume any gas remaining. Additionally

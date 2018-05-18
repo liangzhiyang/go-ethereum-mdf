@@ -12,6 +12,7 @@ var (
 	AuthDelUser         = initAuth(2, "del_user")
 	AuthCreateContract  = initAuth(3, "create_contract")
 	AuthSendTransaction = initAuth(4, "send_transaction")
+	AuthOpAccessNum     = initAuth(5, "op_access_num")
 )
 var _desc map[*Auth]string
 //并非并发安全
