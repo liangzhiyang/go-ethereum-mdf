@@ -595,7 +595,11 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	return pool.validateTxAuth(from, tx, local)
 }
 func (pool *TxPool) validateTxAuth(from common.Address, tx *types.Transaction, local bool) error {
-	return auth.DealAuthCheck(from, *(tx.To()), tx.Data(), pool.currentState)
+	to :=common.Address{}
+	if tmp:=tx.To();tmp!=nil{
+		to = *tmp
+	}
+	return auth.DealAuthCheck(from, to, tx.Data(), pool.currentState)
 }
 
 // add validates a transaction and inserts it into the non-executable queue for

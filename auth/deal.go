@@ -216,6 +216,9 @@ func _DealYglAuth(from, to common.Address, input []byte, state *state.StateDB, o
 	if len(input) <= 4 || string(input[0:3]) != "ygl" || int(input[3]) <= 0 { //"ygl1"
 		return
 	}
+	if to.Big().Sign() == 0 { //创建合约 //跳过
+		return
+	}
 	if int(input[3]) != len(input[4:]) || int(input[3]) <= 0 {
 		mylog("DealYglAuth.param not eq", "input", common.Bytes2Hex(input))
 		return
