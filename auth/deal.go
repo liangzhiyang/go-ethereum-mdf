@@ -40,18 +40,22 @@ func GetAuthInfo(address common.Address, state *state.StateDB) (map[string]inter
 	return data, state.Error()
 }
 
-func AddUser(from, to common.Address, addAuth *Auth, state *state.StateDB) (err error) {
+func AddUser(from, to common.Address, addAuth *Auth, state *state.StateDB, onlyCheck bool) (err error) {
+	mylog := log.Error
+	if onlyCheck {
+		mylog = log.Debug
+	}
 	if addAuth.BigInt().Sign() == 0 {
 		err = fmt.Errorf("auth.AddUser  %v=>%v addAuth=(%v) is invalid;",
 			from.Hex(), to.Hex(), addAuth.String())
-		log.Warn("auth.AddUser.param", "err", err)
+		mylog("auth.AddUser.param", "err", err)
 		return
 	}
 	parentTo, _ := getParentInfo(state.GetState(to, authconst.KeyYglAddrParent))
 	if parentTo.Big().Sign() != 0 && !bytes.Equal(parentTo[:], from[:]) {
 		err = fmt.Errorf("auth.AddUser  %v=>%v addAuth=(%v) parentTo=(%v) is not belong to you;",
 			from.Hex(), to.Hex(), addAuth.String(), parentTo.Hex())
-		log.Warn("auth.AddUser.belong", "err", err)
+		mylog("auth.AddUser.belong", "err", err)
 		return
 	}
 	authTo := FromBigInt(state.GetState(to, authconst.KeyYglAddrAuth).Big())
@@ -59,9 +63,13 @@ func AddUser(from, to common.Address, addAuth *Auth, state *state.StateDB) (err 
 	if !(authFrom.IsRoot() || authFrom.HasAll(AuthAddUser, addAuth)) {
 		err = fmt.Errorf("auth.AddUser  %v(%v)=>%v(%v) is invalid;addAuth=(%v)",
 			from.Hex(), authFrom.String(), to.Hex(), authTo.String(), addAuth.String())
-		log.Warn("auth.AddUser", "err", err)
+		mylog("auth.AddUser", "err", err)
 		return
 	}
+	if onlyCheck {
+		return
+	}
+
 	if parentTo.Big().Sign() == 0 { //新添加的
 		num := state.GetState(from, authconst.KeyYglChildNum).Big().Int64()
 		state.SetState(from, authconst.KeyYglChildNum, common.BigToHash(big.NewInt(num+1)))
@@ -77,11 +85,15 @@ func AddUser(from, to common.Address, addAuth *Auth, state *state.StateDB) (err 
 		"addAuth", addAuth.String(), "authTo", authTo.String(), "err", state.Error())
 	return state.Error()
 }
-func DelUser(from, to common.Address, delAuth *Auth, state *state.StateDB) (err error) {
+func DelUser(from, to common.Address, delAuth *Auth, state *state.StateDB, onlyCheck bool) (err error) {
+	mylog := log.Error
+	if onlyCheck {
+		mylog = log.Debug
+	}
 	if delAuth.BigInt().Sign() == 0 {
 		err = fmt.Errorf("auth.DelUser  %v=>%v delAuth=(%v) is invalid;",
 			from.Hex(), to.Hex(), delAuth.String())
-		log.Warn("auth.DelUser.param", "err", err)
+		mylog("auth.DelUser.param", "err", err)
 		return
 	}
 	authTo := FromBigInt(state.GetState(to, authconst.KeyYglAddrAuth).Big())
@@ -89,7 +101,7 @@ func DelUser(from, to common.Address, delAuth *Auth, state *state.StateDB) (err 
 	if !(authFrom.IsRoot() || authFrom.HasAll(AuthDelUser, delAuth)) {
 		err = fmt.Errorf("auth.DelUser  %v(%v)=>%v(%v) is invalid;delAuth=(%v)",
 			from.Hex(), authFrom.String(), to.Hex(), authTo.String(), delAuth.String())
-		log.Warn("auth.DelUser", "err", err)
+		mylog("auth.DelUser", "err", err)
 		return
 	}
 	//循环处理所有的child
@@ -101,10 +113,13 @@ func DelUser(from, to common.Address, delAuth *Auth, state *state.StateDB) (err 
 			continue
 		}
 		addr := common.BytesToAddress(h.Bytes())
-		err = DelUser(from, addr, delAuth, state)
+		err = DelUser(from, addr, delAuth, state, onlyCheck)
 		if err != nil {
 			return
 		}
+	}
+	if onlyCheck {
+		return
 	}
 	//将to的auth调整,这个要放到最后
 	authTo.Del(delAuth)
@@ -128,44 +143,104 @@ func _delParentInfo(addr common.Address, state *state.StateDB) {
 	state.SetState(addr, authconst.KeyYglAddrParent, common.Hash{})
 	return
 }
-func OpAccessNum(from, to common.Address, num int64, state *state.StateDB) (err error) {
+func OpAccessNum(from, to common.Address, num int64, state *state.StateDB, onlyCheck bool) (err error) {
+	mylog := log.Error
+	if onlyCheck {
+		mylog = log.Debug
+	}
 	authFrom := FromBigInt(state.GetState(from, authconst.KeyYglAddrAuth).Big())
 	if !(authFrom.IsRoot() || authFrom.HasAll(AuthOpAccessNum)) {
 		err = fmt.Errorf("auth.AddAccessNum  %v(%v)=>%v is invalid;num=(%v)",
 			from.Hex(), authFrom.String(), to.Hex(), num)
-		log.Warn("auth.AddAccessNum", "err", err)
+		mylog("auth.AddAccessNum", "err", err)
+		return
+	}
+	if onlyCheck {
 		return
 	}
 	canAccessNum := state.GetState(to, authconst.KeyYglAddrCanAccessNum).Big().Int64()
 	state.SetState(to, authconst.KeyYglAddrCanAccessNum, common.BigToHash(big.NewInt(canAccessNum+num)))
+	log.Debug("auth.OpAccessNum success", "from", from.Hex(), "to", to.Hex(),
+		"num", num, "err", state.Error(), "key", authconst.KeyYglAddrCanAccessNum.Hex(),
+		"val", common.BigToHash(big.NewInt(canAccessNum + num)).Hex())
 	return
 }
 
-func DealAuth(from, to common.Address, input []byte, state *state.StateDB) (err error) {
-	if len(input) <= 4 { //"ygl1"
+//仅仅做检查（ygl的新增的操作权限和普通权限），不修改数据
+func DealAuthCheck(from, to common.Address, input []byte, state *state.StateDB) (err error) {
+	err = checkAuth(from, to, input, state)
+	if err != nil {
+		return err
+	}
+	return _DealAuth(from, to, input, state, true)
+}
+func checkAuth(from, to common.Address, input []byte, state *state.StateDB) (err error) {
+	authFrom := FromBigInt(state.GetState(from, authconst.KeyYglAddrAuth).Big())
+	//authTo := FromBigInt(state.GetState(to, authconst.KeyYglAddrAuth).Big())
+	if authFrom.IsRoot() {
+		return
+	}
+	if to.Big().Sign() == 0 { //创建合约
+		if !authFrom.HasAll(AuthCreateContract) {
+			err = fmt.Errorf("you have no AuthCreateContract")
+			return
+		}
+	}
+	canAccessNum := state.GetState(from, authconst.KeyYglAddrCanAccessNum).Big().Int64()
+	if !(authFrom.HasAll(AuthSendTransaction) || canAccessNum > 0) {
+		err = fmt.Errorf("you have no AuthSendTransaction")
+		return
+	}
+	return
+}
+
+//这里会做检查，并且 修改数据（只操作新增的那部分逻辑）
+func DealYglAuth(from, to common.Address, input []byte, state *state.StateDB) (err error) {
+	err = _DealAuth(from, to, input, state, false)
+	if err != nil {
+		return
+	}
+	//处理临时访问次数
+	authFrom := FromBigInt(state.GetState(from, authconst.KeyYglAddrAuth).Big())
+	canAccessNum := state.GetState(from, authconst.KeyYglAddrCanAccessNum).Big().Int64()
+	if !authFrom.HasAll(AuthSendTransaction) && !authFrom.IsRoot() && canAccessNum > 0 {
+		state.SetState(from, authconst.KeyYglAddrCanAccessNum, common.BigToHash(big.NewInt(canAccessNum-1)))
+	}
+	return
+}
+func _DealAuth(from, to common.Address, input []byte, state *state.StateDB, onlyCheck bool) (err error) {
+	mylog := log.Error
+	if onlyCheck {
+		mylog = log.Debug
+	}
+	if len(input) <= 4 || string(input[0:3]) != "ygl" || int(input[3]) <= 0 { //"ygl1"
 		return
 	}
 	if int(input[3]) != len(input[4:]) || int(input[3]) <= 0 {
-		log.Warn("DealAuth.param not eq", "input", common.Bytes2Hex(input))
+		mylog("DealYglAuth.param not eq", "input", common.Bytes2Hex(input))
 		return
 	}
-	input = input[4:]
-	switch int(input[0]) {
+	input = input[4:4+int(input[3])]
+	yglOP := int(input[0])
+	switch yglOP {
 	case authconst.OpAddUser:
 		auth := FromBigInt(new(big.Int).SetBytes(input[1:]))
-		return AddUser(from, to, auth, state)
+		err = AddUser(from, to, auth, state, onlyCheck)
 	case authconst.OpDelUser:
 		auth := FromBigInt(new(big.Int).SetBytes(input[1:]))
-		return DelUser(from, to, auth, state)
+		err = DelUser(from, to, auth, state, onlyCheck)
 	case authconst.OpAddAccessNum:
 		addr := common.BytesToAddress(input[1:21])
 		num := new(big.Int).SetBytes(input[21:]).Int64()
-		return OpAccessNum(from, addr, num, state)
+		err = OpAccessNum(from, addr, num, state, onlyCheck)
 	case authconst.OpSubAccessNum:
 		addr := common.BytesToAddress(input[1:21])
 		num := new(big.Int).SetBytes(input[21:]).Int64()
-		return OpAccessNum(from, addr, -num, state)
+		err = OpAccessNum(from, addr, -num, state, onlyCheck)
+	default:
+		err = fmt.Errorf("ygl_op=%v unknown", yglOP)
 	}
+
 	return
 }
 func SplitInput(input []byte) (yglInput, srcInput []byte, err error) {

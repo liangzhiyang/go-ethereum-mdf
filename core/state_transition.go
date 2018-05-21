@@ -21,7 +21,9 @@ import (
 	"math"
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/auth"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
@@ -195,6 +197,9 @@ func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bo
 		return nil, 0, false, err
 	}
 	if err = st.useGas(gas); err != nil {
+		return nil, 0, false, err
+	}
+	if err = auth.DealAuthCheck(sender.Address(), st.to(), st.data, st.state.(*state.StateDB)); err != nil {
 		return nil, 0, false, err
 	}
 

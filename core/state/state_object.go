@@ -92,7 +92,8 @@ type stateObject struct {
 // empty returns whether the account is considered empty.
 func (s *stateObject) empty() bool {
 	return s.data.Nonce == 0 && s.data.Balance.Sign() == 0 && bytes.Equal(s.data.CodeHash, emptyCodeHash) &&
-		common.EmptyHash(s.GetState(s.db.db, authconst.KeyYglAddrAuth))
+		common.EmptyHash(s.GetState(s.db.db, authconst.KeyYglAddrAuth)) &&
+		common.EmptyHash(s.GetState(s.db.db, authconst.KeyYglAddrCanAccessNum))
 }
 
 // Account is the Ethereum consensus representation of accounts.
