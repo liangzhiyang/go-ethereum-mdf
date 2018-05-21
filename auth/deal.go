@@ -172,7 +172,7 @@ func DealAuthCheck(from, to common.Address, input []byte, state *state.StateDB) 
 	if err != nil {
 		return err
 	}
-	return _DealAuth(from, to, input, state, true)
+	return _DealYglAuth(from, to, input, state, true)
 }
 func checkAuth(from, to common.Address, input []byte, state *state.StateDB) (err error) {
 	authFrom := FromBigInt(state.GetState(from, authconst.KeyYglAddrAuth).Big())
@@ -196,7 +196,7 @@ func checkAuth(from, to common.Address, input []byte, state *state.StateDB) (err
 
 //这里会做检查，并且 修改数据（只操作新增的那部分逻辑）
 func DealYglAuth(from, to common.Address, input []byte, state *state.StateDB) (err error) {
-	err = _DealAuth(from, to, input, state, false)
+	err = _DealYglAuth(from, to, input, state, false)
 	if err != nil {
 		return
 	}
@@ -208,7 +208,7 @@ func DealYglAuth(from, to common.Address, input []byte, state *state.StateDB) (e
 	}
 	return
 }
-func _DealAuth(from, to common.Address, input []byte, state *state.StateDB, onlyCheck bool) (err error) {
+func _DealYglAuth(from, to common.Address, input []byte, state *state.StateDB, onlyCheck bool) (err error) {
 	mylog := log.Error
 	if onlyCheck {
 		mylog = log.Debug
