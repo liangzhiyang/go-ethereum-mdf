@@ -219,8 +219,9 @@ func _DealYglAuth(from, to common.Address, input []byte, state *state.StateDB, o
 	if to.Big().Sign() == 0 { //创建合约 //跳过
 		return
 	}
-	if int(input[3]) != len(input[4:]) || int(input[3]) <= 0 {
-		mylog("DealYglAuth.param not eq", "input", common.Bytes2Hex(input))
+	if int(input[3]) > len(input[4:]) || int(input[3]) <= 0 {
+		mylog("DealYglAuth.param invalid", "input", common.Bytes2Hex(input))
+		err = fmt.Errorf("DealYglAuth.param invalid,input=%v", common.Bytes2Hex(input))
 		return
 	}
 	input = input[4:4+int(input[3])]
