@@ -465,7 +465,7 @@ func (self *worker) commitNewWork() {
 	if work.tcount <= 0 && atomic.LoadInt32(&self.mining) == 1 {
 		select {
 		case self.commitNewWorkCh <- struct{}{}:
-			log.Info("have none valid transactions,skip")
+			log.Info("have none valid transactions,wait 1 second")
 		default:
 			log.Warn("self.commitNewWorkCh send failed")
 		}
