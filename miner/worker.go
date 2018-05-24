@@ -129,25 +129,28 @@ type worker struct {
 	// atomic status counters
 	mining int32
 	atWork int32
+
+	commitNewWorkCh chan struct{} //
 }
 
 func newWorker(config *params.ChainConfig, engine consensus.Engine, coinbase common.Address, eth Backend, mux *event.TypeMux) *worker {
 	worker := &worker{
-		config:         config,
-		engine:         engine,
-		eth:            eth,
-		mux:            mux,
-		txCh:           make(chan core.TxPreEvent, txChanSize),
-		chainHeadCh:    make(chan core.ChainHeadEvent, chainHeadChanSize),
-		chainSideCh:    make(chan core.ChainSideEvent, chainSideChanSize),
-		chainDb:        eth.ChainDb(),
-		recv:           make(chan *Result, resultQueueSize),
-		chain:          eth.BlockChain(),
-		proc:           eth.BlockChain().Validator(),
-		possibleUncles: make(map[common.Hash]*types.Block),
-		coinbase:       coinbase,
-		agents:         make(map[Agent]struct{}),
-		unconfirmed:    newUnconfirmedBlocks(eth.BlockChain(), miningLogAtDepth),
+		config:          config,
+		engine:          engine,
+		eth:             eth,
+		mux:             mux,
+		txCh:            make(chan core.TxPreEvent, txChanSize),
+		chainHeadCh:     make(chan core.ChainHeadEvent, chainHeadChanSize),
+		chainSideCh:     make(chan core.ChainSideEvent, chainSideChanSize),
+		chainDb:         eth.ChainDb(),
+		recv:            make(chan *Result, resultQueueSize),
+		chain:           eth.BlockChain(),
+		proc:            eth.BlockChain().Validator(),
+		possibleUncles:  make(map[common.Hash]*types.Block),
+		coinbase:        coinbase,
+		agents:          make(map[Agent]struct{}),
+		unconfirmed:     newUnconfirmedBlocks(eth.BlockChain(), miningLogAtDepth),
+		commitNewWorkCh: make(chan struct{}, 1),
 	}
 	// Subscribe TxPreEvent for tx pool
 	worker.txSub = eth.TxPool().SubscribeTxPreEvent(worker.txCh)
@@ -252,13 +255,16 @@ func (self *worker) update() {
 		case <-self.chainHeadCh:
 			self.commitNewWork()
 
-		// Handle ChainSideEvent
+		case <-self.commitNewWorkCh:
+			time.Sleep(time.Second)
+			self.commitNewWork()
+			// Handle ChainSideEvent
 		case ev := <-self.chainSideCh:
 			self.uncleMu.Lock()
 			self.possibleUncles[ev.Block.Hash()] = ev.Block
 			self.uncleMu.Unlock()
 
-		// Handle TxPreEvent
+			// Handle TxPreEvent
 		case ev := <-self.txCh:
 			// Apply transaction to the pending state if we're not mining
 			if atomic.LoadInt32(&self.mining) == 0 {
@@ -277,7 +283,7 @@ func (self *worker) update() {
 				}
 			}
 
-		// System stopped
+			// System stopped
 		case <-self.txSub.Err():
 			return
 		case <-self.chainHeadSub.Err():
@@ -456,7 +462,15 @@ func (self *worker) commitNewWork() {
 	}
 	txs := types.NewTransactionsByPriceAndNonce(self.current.signer, pending)
 	work.commitTransactions(self.mux, txs, self.chain, self.coinbase)
-
+	if work.tcount <= 0 && atomic.LoadInt32(&self.mining) == 1 {
+		select {
+		case self.commitNewWorkCh <- struct{}{}:
+			log.Info("have none valid transactions,skip")
+		default:
+			log.Warn("self.commitNewWorkCh send failed")
+		}
+		return
+	}
 	// compute uncles for the new block.
 	var (
 		uncles    []*types.Header
