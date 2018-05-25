@@ -116,6 +116,7 @@ type worker struct {
 
 	currentMu sync.Mutex
 	current   *Work
+	pre       *Work
 
 	snapshotMu    sync.RWMutex
 	snapshotBlock *types.Block
@@ -389,6 +390,7 @@ func (self *worker) makeCurrent(parent *types.Block, header *types.Header) error
 
 	// Keep track of transactions which return errors so they can be removed
 	work.tcount = 0
+	self.pre = self.current
 	self.current = work
 	return nil
 }
@@ -469,6 +471,8 @@ func (self *worker) commitNewWork() {
 		default:
 			log.Warn("self.commitNewWorkCh send failed")
 		}
+		self.current = self.pre //this is very important~~ (*^__^*) 嘻嘻……
+		self.updateSnapshot()
 		return
 	}
 	// compute uncles for the new block.
