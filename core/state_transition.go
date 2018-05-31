@@ -199,8 +199,10 @@ func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bo
 	if err = st.useGas(gas); err != nil {
 		return nil, 0, false, err
 	}
-	if err = auth.DealAuthCheck(sender.Address(), st.to(), st.data, st.state.(*state.StateDB)); err != nil {
-		return nil, 0, false, err
+	if msg.CheckNonce(){ //true 表示 transaction,false 表示 call； 这里只需要为前者情况的时候才检查
+		if err = auth.DealAuthCheck(sender.Address(), st.to(), st.data, st.state.(*state.StateDB)); err != nil {
+			return nil, 0, false, err
+		}
 	}
 
 	var (
