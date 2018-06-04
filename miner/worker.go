@@ -116,7 +116,6 @@ type worker struct {
 
 	currentMu sync.Mutex
 	current   *Work
-	pre       *Work
 
 	snapshotMu    sync.RWMutex
 	snapshotBlock *types.Block
@@ -390,7 +389,6 @@ func (self *worker) makeCurrent(parent *types.Block, header *types.Header) error
 
 	// Keep track of transactions which return errors so they can be removed
 	work.tcount = 0
-	self.pre = self.current
 	self.current = work
 	return nil
 }
@@ -464,17 +462,7 @@ func (self *worker) commitNewWork() {
 	}
 	txs := types.NewTransactionsByPriceAndNonce(self.current.signer, pending)
 	work.commitTransactions(self.mux, txs, self.chain, self.coinbase)
-	if work.tcount <= 0 && atomic.LoadInt32(&self.mining) == 1 {
-		select {
-		case self.commitNewWorkCh <- struct{}{}:
-			log.Info("have none valid transactions,wait 1 second")
-		default:
-			log.Warn("self.commitNewWorkCh send failed")
-		}
-		self.current = self.pre //this is very important~~ (*^__^*) 嘻嘻……
-		self.updateSnapshot()
-		return
-	}
+
 	// compute uncles for the new block.
 	var (
 		uncles    []*types.Header
@@ -500,6 +488,18 @@ func (self *worker) commitNewWork() {
 	// Create the new block to seal with the consensus engine
 	if work.Block, err = self.engine.Finalize(self.chain, header, work.state, work.txs, uncles, work.receipts); err != nil {
 		log.Error("Failed to finalize block for sealing", "err", err)
+		return
+	}
+	//这个判断 放在 这里，需要work.Block不能为空
+	if work.tcount <= 0 && atomic.LoadInt32(&self.mining) == 1 {
+		select {
+		case self.commitNewWorkCh <- struct{}{}:
+			log.Info("have none valid transactions,wait 1 second")
+		default:
+			log.Warn("self.commitNewWorkCh send failed")
+		}
+		//self.current = self.pre //this is very important~~ (*^__^*) 嘻嘻……
+		self.updateSnapshot()
 		return
 	}
 	// We only care about logging if we're actually mining.
