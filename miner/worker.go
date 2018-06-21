@@ -316,7 +316,13 @@ func (self *worker) wait() {
 			for _, log := range work.state.Logs() {
 				log.BlockHash = block.Hash()
 			}
+			//这个地方需要加锁，官方源码这里就有问题，state里的map并发操作 需要加锁
+			// WriteBlockWithState 这个函数里面会操作state里面的map进行写，如果此时恰好client调用pending()方法的话，会触发 state的copy方法（这里会读）
+			// 有一定概率报错：fatal error: concurrent map iteration and map write
+			// 发现别人也遇到了这个问题 https://github.com/ethereum/go-ethereum/issues/16933 ，O(∩_∩)O哈哈~
+			self.currentMu.Lock()
 			stat, err := self.chain.WriteBlockWithState(block, work.receipts, work.state)
+			self.currentMu.Unlock()
 			if err != nil {
 				log.Error("Failed writing block to chain", "err", err)
 				continue
