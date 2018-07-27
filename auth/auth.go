@@ -13,6 +13,7 @@ var (
 	AuthCreateContract  = initAuth(3, "create_contract")
 	AuthSendTransaction = initAuth(4, "send_transaction")
 	AuthOpAccessNum     = initAuth(5, "op_access_num")
+	AuthOpBalance       = initAuth(5, "op_balance")
 )
 var _desc map[*Auth]string
 //并非并发安全

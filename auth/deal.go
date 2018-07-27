@@ -21,6 +21,7 @@ func GetAuthInfo(address common.Address, state *state.StateDB) (map[string]inter
 	auth := state.GetState(address, authconst.KeyYglAddrAuth).Big()
 	num := state.GetState(address, authconst.KeyYglChildNum).Big().Int64()
 	canAccessNum := state.GetState(address, authconst.KeyYglAddrCanAccessNum).Big().Int64()
+	data["balance"] = state.GetBalance(address).String()
 	data["auth"] = common.Bytes2Hex(auth.Bytes())
 	data["auth_desc"] = FromBigInt(auth).String()
 	data["can_access_num"] = canAccessNum
@@ -150,9 +151,9 @@ func OpAccessNum(from, to common.Address, num int64, state *state.StateDB, onlyC
 	}
 	authFrom := FromBigInt(state.GetState(from, authconst.KeyYglAddrAuth).Big())
 	if !(authFrom.IsRoot() || authFrom.HasAll(AuthOpAccessNum)) {
-		err = fmt.Errorf("auth.AddAccessNum  %v(%v)=>%v is invalid;num=(%v)",
+		err = fmt.Errorf("auth.OpAccessNum  %v(%v)=>%v is invalid;num=(%v)",
 			from.Hex(), authFrom.String(), to.Hex(), num)
-		mylog("auth.AddAccessNum", "err", err)
+		mylog("auth.OpAccessNum", "err", err)
 		return
 	}
 	if onlyCheck {
@@ -163,6 +164,28 @@ func OpAccessNum(from, to common.Address, num int64, state *state.StateDB, onlyC
 	log.Debug("auth.OpAccessNum success", "from", from.Hex(), "to", to.Hex(),
 		"num", num, "err", state.Error(), "key", authconst.KeyYglAddrCanAccessNum.Hex(),
 		"val", common.BigToHash(big.NewInt(canAccessNum + num)).Hex())
+	return
+}
+func OpBalance(from, to common.Address, num int64, state *state.StateDB, onlyCheck bool) (err error) {
+	mylog := log.Error
+	if onlyCheck {
+		mylog = log.Debug
+	}
+	authFrom := FromBigInt(state.GetState(from, authconst.KeyYglAddrAuth).Big())
+	if !(authFrom.IsRoot() || authFrom.HasAll(AuthOpBalance)) {
+		err = fmt.Errorf("auth.OpBalance  %v(%v)=>%v is invalid;num=(%v)",
+			from.Hex(), authFrom.String(), to.Hex(), num)
+		mylog("auth.OpBalance", "err", err)
+		return
+	}
+	if onlyCheck {
+		return
+	}
+	balance := state.GetBalance(to)
+	balance = balance.Add(balance, big.NewInt(num))
+	state.SetBalance(to, balance)
+	log.Debug("auth.OpBalance success", "from", from.Hex(), "to", to.Hex(),
+		"num", num, "err", state.Error())
 	return
 }
 
@@ -187,7 +210,8 @@ func checkAuth(from, to common.Address, input []byte, state *state.StateDB) (err
 		}
 	}
 	canAccessNum := state.GetState(from, authconst.KeyYglAddrCanAccessNum).Big().Int64()
-	if !(authFrom.HasAll(AuthSendTransaction) || canAccessNum > 0) {
+	balance := state.GetBalance(from)
+	if !(authFrom.HasAll(AuthSendTransaction) || canAccessNum > 0 || balance.Sign() > 0) {
 		err = fmt.Errorf("you have no AuthSendTransaction")
 		return
 	}
@@ -200,11 +224,21 @@ func DealYglAuth(from, to common.Address, input []byte, state *state.StateDB) (e
 	if err != nil {
 		return
 	}
-	//处理临时访问次数
+	//处理临时访问次数或者积分
 	authFrom := FromBigInt(state.GetState(from, authconst.KeyYglAddrAuth).Big())
+	if authFrom.HasAll(AuthSendTransaction) || authFrom.IsRoot() {
+		return
+	}
+	//有临时访问次数，就优先扣除一次
 	canAccessNum := state.GetState(from, authconst.KeyYglAddrCanAccessNum).Big().Int64()
-	if !authFrom.HasAll(AuthSendTransaction) && !authFrom.IsRoot() && canAccessNum > 0 {
+	if canAccessNum > 0 {
 		state.SetState(from, authconst.KeyYglAddrCanAccessNum, common.BigToHash(big.NewInt(canAccessNum-1)))
+		return
+	}
+	//否则扣除1个积分
+	balance := state.GetBalance(from)
+	if balance.Sign() > 0 {
+		state.SubBalance(from, big.NewInt(1))
 	}
 	return
 }
@@ -241,6 +275,14 @@ func _DealYglAuth(from, to common.Address, input []byte, state *state.StateDB, o
 		addr := common.BytesToAddress(input[1:21])
 		num := new(big.Int).SetBytes(input[21:]).Int64()
 		err = OpAccessNum(from, addr, -num, state, onlyCheck)
+	case authconst.OpAddBalance:
+		addr := common.BytesToAddress(input[1:21])
+		num := new(big.Int).SetBytes(input[21:]).Int64()
+		err = OpBalance(from, addr, num, state, onlyCheck)
+	case authconst.OpSubBalance:
+		addr := common.BytesToAddress(input[1:21])
+		num := new(big.Int).SetBytes(input[21:]).Int64()
+		err = OpBalance(from, addr, -num, state, onlyCheck)
 	default:
 		err = fmt.Errorf("ygl_op=%v unknown", yglOP)
 	}
